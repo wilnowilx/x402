@@ -208,11 +208,30 @@ export async function processPaymentResponse(
   if (chargedAmount !== undefined && typeof chargedAmount !== "string") {
     throw new Error("invalid chargedAmount: not a non-negative integer");
   }
+
+  // Defensive: validate chargedAmount is a valid integer string before BigInt
+  // conversion. A malformed server response could cause an uncaught TypeError.
+  if (chargedAmount !== undefined && !/^\d+$/.test(chargedAmount)) {
+    throw new Error("invalid chargedAmount: not a non-negative integer");
+  }
+
   const channelState = settle.extra?.channelState as BatchSettlementChannelStateExtra | undefined;
+
+  // Validate channelState shape before use. A server response with a partial
+  // channelState (e.g. missing chargedCumulativeAmount) should not crash the
+  // client — skip the state update instead.
+  const chargedCumulativeAmount = channelState?.chargedCumulativeAmount;
+  if (
+    chargedCumulativeAmount !== undefined &&
+    (typeof chargedCumulativeAmount !== "string" || !/^\d+$/.test(chargedCumulativeAmount))
+  ) {
+    return;
+  }
+
   await updateChannelFromSettle(storage, {
     server: {
       chargedAmount,
-      chargedCumulativeAmount: channelState?.chargedCumulativeAmount,
+      chargedCumulativeAmount,
     },
     local,
   });
