@@ -2139,6 +2139,22 @@ describe("Bazaar Discovery Extension", () => {
       expect(isValidRouteTemplate("/users/%2e%2e/admin")).toBe(false);
       expect(isValidRouteTemplate("/users/%2E%2E/admin")).toBe(false);
     });
+
+    it("rejects double-percent-encoded traversal sequences", () => {
+      // %252e decodes to %2e, which decodes to . — single-decode misses this
+      expect(isValidRouteTemplate("/foo/%252e%252e%252fsecret")).toBe(false);
+      expect(isValidRouteTemplate("/foo/%252e%252e/admin")).toBe(false);
+    });
+
+    it("rejects double-percent-encoded scheme injection", () => {
+      // %253a%252f%252f decodes to ://  — single-decode misses this
+      expect(isValidRouteTemplate("/foo%253a%252f%252fevil.example.com/bar")).toBe(false);
+    });
+
+    it("rejects triple-encoded traversal", () => {
+      // %25252e%25252e decodes through 3 layers to ..
+      expect(isValidRouteTemplate("/a/%25252e%25252e/b")).toBe(false);
+    });
   });
 
   describe("isValidServiceName", () => {

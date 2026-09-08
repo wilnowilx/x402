@@ -45,6 +45,9 @@ const ROUTE_TEMPLATE_REGEX = /^\/[a-zA-Z0-9_/:.\-~%]+$/;
  * - Must not contain ".." (path traversal)
  * - Must not contain "://" (URL injection)
  *
+ * Percent-encoding is decoded iteratively until stable before the traversal and
+ * injection checks run, so double-encoded payloads like %252e%252e are caught.
+ *
  * @param value - The raw routeTemplate string from the client payload
  * @returns true if the value is a valid routeTemplate, false otherwise
  *
@@ -53,13 +56,23 @@ const ROUTE_TEMPLATE_REGEX = /^\/[a-zA-Z0-9_/:.\-~%]+$/;
 export function isValidRouteTemplate(value: string | undefined): value is string {
   if (!value) return false;
   if (!ROUTE_TEMPLATE_REGEX.test(value)) return false;
-  // Decode percent-encoding before traversal checks so that %2e%2e is caught.
-  let decoded: string;
-  try {
-    decoded = decodeURIComponent(value);
-  } catch {
-    return false;
-  }
+
+  // Decode percent-encoding iteratively until stable. A single decode pass
+  // does not catch double-encoded payloads (e.g. %252e%252e decodes to %2e%2e
+  // on the first pass, which still passes the ".." check). Looping until the
+  // string stops changing ensures every layer of encoding is stripped.
+  let decoded = value;
+  let prev: string;
+  do {
+    prev = decoded;
+    try {
+      decoded = decodeURIComponent(decoded);
+    } catch {
+      // Malformed percent-encoding — reject.
+      return false;
+    }
+  } while (decoded !== prev);
+
   if (decoded.includes("..")) return false;
   if (decoded.includes("://")) return false;
   return true;
