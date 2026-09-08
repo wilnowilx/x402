@@ -1,4 +1,5 @@
-import { VerifyResponse, PaymentPayload, PaymentRequirements } from "@x402/core/types";
+import { VerifyResponse } from "@x402/core/types";
+import { parsePaymentPayload, parsePaymentRequirements } from "@x402/core/schemas";
 import { getFacilitator } from "../index";
 
 /**
@@ -9,13 +10,10 @@ import { getFacilitator } from "../index";
  */
 export async function POST(req: Request) {
   // Parse request body - handle JSON parsing errors separately
-  let paymentPayload: PaymentPayload | undefined;
-  let paymentRequirements: PaymentRequirements | undefined;
+  let body: Record<string, unknown>;
 
   try {
-    const body = await req.json();
-    paymentPayload = body.paymentPayload as PaymentPayload;
-    paymentRequirements = body.paymentRequirements as PaymentRequirements;
+    body = await req.json();
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     console.error("Failed to parse request body:", errorMessage);
@@ -31,7 +29,7 @@ export async function POST(req: Request) {
   }
 
   // Check for missing parameters
-  if (!paymentPayload || !paymentRequirements) {
+  if (!body.paymentPayload || !body.paymentRequirements) {
     return Response.json(
       {
         isValid: false,
@@ -43,13 +41,46 @@ export async function POST(req: Request) {
     );
   }
 
+  // Validate schemas before forwarding to the facilitator.
+  // Without this, a malformed v2 payload (e.g. missing `accepted`) would
+  // produce an opaque 500 deep inside the scheme handler instead of a
+  // clear 400 the caller can fix.
+  const payloadResult = parsePaymentPayload(body.paymentPayload);
+  if (!payloadResult.success) {
+    return Response.json(
+      {
+        isValid: false,
+        invalidReason: "invalid_payment_payload",
+        invalidMessage: `paymentPayload validation failed: ${payloadResult.error.issues.map(i => i.message).join(", ")}`,
+        error: payloadResult.error.message,
+      } as VerifyResponse,
+      { status: 400 },
+    );
+  }
+
+  const requirementsResult = parsePaymentRequirements(body.paymentRequirements);
+  if (!requirementsResult.success) {
+    return Response.json(
+      {
+        isValid: false,
+        invalidReason: "invalid_payment_requirements",
+        invalidMessage: `paymentRequirements validation failed: ${requirementsResult.error.issues.map(i => i.message).join(", ")}`,
+        error: requirementsResult.error.message,
+      } as VerifyResponse,
+      { status: 400 },
+    );
+  }
+
   try {
     const facilitator = await getFacilitator();
 
     // Hooks will automatically:
     // - Track verified payment (onAfterVerify)
     // - Extract and catalog discovery info (onAfterVerify)
-    const response: VerifyResponse = await facilitator.verify(paymentPayload, paymentRequirements);
+    const response: VerifyResponse = await facilitator.verify(
+      payloadResult.data,
+      requirementsResult.data,
+    );
 
     return Response.json(response);
   } catch (error) {

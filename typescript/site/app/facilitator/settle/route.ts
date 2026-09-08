@@ -1,4 +1,5 @@
-import { PaymentPayload, PaymentRequirements, SettleResponse } from "@x402/core/types";
+import { SettleResponse } from "@x402/core/types";
+import { parsePaymentPayload, parsePaymentRequirements } from "@x402/core/schemas";
 import { getFacilitator } from "../index";
 
 /**
@@ -9,13 +10,10 @@ import { getFacilitator } from "../index";
  */
 export async function POST(req: Request) {
   // Parse request body - only use "unknown:unknown" if parsing fails
-  let paymentPayload: PaymentPayload | undefined;
-  let paymentRequirements: PaymentRequirements | undefined;
+  let body: Record<string, unknown>;
 
   try {
-    const body = await req.json();
-    paymentPayload = body.paymentPayload as PaymentPayload;
-    paymentRequirements = body.paymentRequirements as PaymentRequirements;
+    body = await req.json();
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     console.error("Failed to parse request body:", errorMessage);
@@ -33,7 +31,7 @@ export async function POST(req: Request) {
   }
 
   // Check for missing parameters
-  if (!paymentPayload || !paymentRequirements) {
+  if (!body.paymentPayload || !body.paymentRequirements) {
     return Response.json(
       {
         success: false,
@@ -42,14 +40,49 @@ export async function POST(req: Request) {
         error: "Missing paymentPayload or paymentRequirements",
         transaction: "",
         // Use network from paymentRequirements if available, otherwise unknown
-        network: (paymentRequirements?.network || "unknown:unknown") as `${string}:${string}`,
+        network: ((body.paymentRequirements as Record<string, unknown>)?.network ||
+          "unknown:unknown") as `${string}:${string}`,
       } as SettleResponse,
       { status: 400 },
     );
   }
 
-  // At this point we know we have both paymentPayload and paymentRequirements
-  const network = paymentRequirements.network;
+  // Validate schemas before forwarding to the facilitator.
+  // Without this, a malformed v2 payload (e.g. missing `accepted`) would
+  // produce an opaque 500 deep inside the scheme handler instead of a
+  // clear 400 the caller can fix.
+  const payloadResult = parsePaymentPayload(body.paymentPayload);
+  if (!payloadResult.success) {
+    return Response.json(
+      {
+        success: false,
+        errorReason: "invalid_payment_payload",
+        errorMessage: `paymentPayload validation failed: ${payloadResult.error.issues.map(i => i.message).join(", ")}`,
+        error: payloadResult.error.message,
+        transaction: "",
+        network: "unknown:unknown" as `${string}:${string}`,
+      } as SettleResponse,
+      { status: 400 },
+    );
+  }
+
+  const requirementsResult = parsePaymentRequirements(body.paymentRequirements);
+  if (!requirementsResult.success) {
+    return Response.json(
+      {
+        success: false,
+        errorReason: "invalid_payment_requirements",
+        errorMessage: `paymentRequirements validation failed: ${requirementsResult.error.issues.map(i => i.message).join(", ")}`,
+        error: requirementsResult.error.message,
+        transaction: "",
+        network: "unknown:unknown" as `${string}:${string}`,
+      } as SettleResponse,
+      { status: 400 },
+    );
+  }
+
+  // At this point we know we have both validated paymentPayload and paymentRequirements
+  const network = requirementsResult.data.network;
 
   try {
     const facilitator = await getFacilitator();
@@ -58,7 +91,10 @@ export async function POST(req: Request) {
     // - Validate payment was verified (onBeforeSettle - will abort if not)
     // - Check verification timeout (onBeforeSettle)
     // - Clean up tracking (onAfterSettle / onSettleFailure)
-    const response: SettleResponse = await facilitator.settle(paymentPayload, paymentRequirements);
+    const response: SettleResponse = await facilitator.settle(
+      payloadResult.data,
+      requirementsResult.data,
+    );
 
     return Response.json(response);
   } catch (error) {
