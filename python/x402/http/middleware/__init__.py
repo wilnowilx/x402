@@ -1,6 +1,6 @@
 """HTTP middleware for x402 payment handling.
 
-Provides server-side middleware for FastAPI and Flask that
+Provides server-side middleware for FastAPI, Flask, and Django that
 protects endpoints with x402 payment requirements.
 
 Note: Import specific middleware modules directly to avoid
@@ -8,6 +8,7 @@ requiring all framework dependencies:
 
     from x402.http.middleware.fastapi import payment_middleware
     from x402.http.middleware.flask import PaymentMiddleware
+    from x402.http.middleware.django import X402PaymentMiddleware
 """
 
 # Lazy imports - only import when the module is accessed to avoid
@@ -25,6 +26,11 @@ __all__ = [
     "ResponseWrapper",
     "flask_payment_middleware",
     "flask_payment_middleware_from_config",
+    # Django
+    "DjangoAdapter",
+    "X402PaymentMiddleware",
+    "django_payment_middleware",
+    "django_set_settlement_overrides",
 ]
 
 
@@ -68,5 +74,23 @@ def __getattr__(name: str):
             return _flask.payment_middleware
         elif name == "flask_payment_middleware_from_config":
             return _flask.payment_middleware_from_config
+
+    # Django imports
+    if name in (
+        "DjangoAdapter",
+        "X402PaymentMiddleware",
+        "django_payment_middleware",
+        "django_set_settlement_overrides",
+    ):
+        from . import django as _django
+
+        if name == "DjangoAdapter":
+            return _django.DjangoAdapter
+        elif name == "X402PaymentMiddleware":
+            return _django.X402PaymentMiddleware
+        elif name == "django_payment_middleware":
+            return _django.payment_middleware
+        elif name == "django_set_settlement_overrides":
+            return _django.set_settlement_overrides
 
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
