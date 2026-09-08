@@ -54,16 +54,15 @@ describe("ExactStellarScheme - getExtra", () => {
     expect(mockRpcClient.getLatestLedger).not.toHaveBeenCalled();
   });
 
-  it("should use custom areFeesSponsored", () => {
+  it("should reject areFeesSponsored: false with a clear error", () => {
     const signer = createEd25519Signer(
       "SDV3OZOPGIO6GQAVI7T6ZJ7NSNFB26JX6QZYCI64TBC7BAZY6FQVAXXK",
       STELLAR_TESTNET_CAIP2,
     );
 
-    scheme = new ExactStellarScheme([signer], { areFeesSponsored: false });
-
-    const result = scheme.getExtra(STELLAR_TESTNET_CAIP2);
-    expect(result).toEqual({ areFeesSponsored: false });
+    expect(() => new ExactStellarScheme([signer], { areFeesSponsored: false })).toThrow(
+      /areFeesSponsored: false is not supported/,
+    );
   });
 
   it("should return consistent areFeesSponsored with multiple signers", () => {

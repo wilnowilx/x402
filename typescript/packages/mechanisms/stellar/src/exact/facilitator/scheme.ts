@@ -146,6 +146,19 @@ export class ExactStellarScheme implements SchemeNetworkFacilitator {
 
     // Apply configuration options (with defaults)
     this.rpcConfig = rpcConfig;
+
+    // The spec only supports areFeesSponsored: true. Setting it to false
+    // silently breaks every settlement: the client throws
+    // "Exact scheme requires areFeesSponsored to be true" with no hint
+    // that the facilitator, not the client, is misconfigured. Fail fast
+    // at construction time instead.
+    if (areFeesSponsored === false) {
+      throw new Error(
+        "ExactStellarScheme: areFeesSponsored: false is not supported by the x402 spec. " +
+          "The client will reject payments with areFeesSponsored: false. " +
+          "Remove the option or set it to true.",
+      );
+    }
     this.areFeesSponsored = areFeesSponsored ?? true;
     this.maxTransactionFeeStroops = maxTransactionFeeStroops ?? DEFAULT_MAX_TRANSACTION_FEE_STROOPS;
     this.selectSigner = selectSigner ?? roundRobinSelectSigner();
