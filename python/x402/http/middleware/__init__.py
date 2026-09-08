@@ -1,13 +1,14 @@
 """HTTP middleware for x402 payment handling.
 
-Provides server-side middleware for FastAPI and Flask that
-protects endpoints with x402 payment requirements.
+Provides server-side middleware for FastAPI, Flask, and generic ASGI
+frameworks that protects endpoints with x402 payment requirements.
 
 Note: Import specific middleware modules directly to avoid
 requiring all framework dependencies:
 
     from x402.http.middleware.fastapi import payment_middleware
     from x402.http.middleware.flask import PaymentMiddleware
+    from x402.http.middleware.asgi import X402ASGIMiddleware
 """
 
 # Lazy imports - only import when the module is accessed to avoid
@@ -25,6 +26,11 @@ __all__ = [
     "ResponseWrapper",
     "flask_payment_middleware",
     "flask_payment_middleware_from_config",
+    # ASGI (generic)
+    "ASGIAdapter",
+    "X402ASGIMiddleware",
+    "asgi_payment_middleware",
+    "asgi_payment_middleware_from_config",
 ]
 
 
@@ -68,5 +74,23 @@ def __getattr__(name: str):
             return _flask.payment_middleware
         elif name == "flask_payment_middleware_from_config":
             return _flask.payment_middleware_from_config
+
+    # ASGI (generic) imports
+    if name in (
+        "ASGIAdapter",
+        "X402ASGIMiddleware",
+        "asgi_payment_middleware",
+        "asgi_payment_middleware_from_config",
+    ):
+        from . import asgi as _asgi
+
+        if name == "ASGIAdapter":
+            return _asgi.ASGIAdapter
+        elif name == "X402ASGIMiddleware":
+            return _asgi.X402ASGIMiddleware
+        elif name == "asgi_payment_middleware":
+            return _asgi.payment_middleware
+        elif name == "asgi_payment_middleware_from_config":
+            return _asgi.payment_middleware_from_config
 
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

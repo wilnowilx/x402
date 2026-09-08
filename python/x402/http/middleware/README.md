@@ -119,14 +119,73 @@ from x402.http.middleware import payment_middleware
 payment_middleware(app, routes, server, paywall_config={"appName": "My API"})
 ```
 
+## Generic ASGI (Any ASGI Framework)
+
+Works with Litestar, BlackSheep, Quart, or any raw ASGI app. No framework-specific dependencies.
+
+### Basic Usage
+
+```python
+from x402 import x402ResourceServerSync
+from x402.http import HTTPFacilitatorClientSync
+from x402.http.middleware.asgi import X402ASGIMiddleware
+from x402.mechanisms.evm.exact import ExactEvmServerScheme
+
+# Your ASGI app (Litestar, BlackSheep, Quart, etc.)
+async def app(scope, receive, send):
+    ...
+
+# Configure server (sync variant required for ASGI middleware)
+facilitator = HTTPFacilitatorClientSync(url="https://x402.org/facilitator")
+server = x402ResourceServerSync(facilitator)
+server.register("eip155:*", ExactEvmServerScheme())
+
+# Define routes
+routes = {
+    "GET /api/weather/*": {
+        "accepts": {
+            "scheme": "exact",
+            "payTo": "0x...",
+            "price": "$0.01",
+            "network": "eip155:84532",
+        },
+    },
+}
+
+# Wrap your ASGI app
+app = X402ASGIMiddleware(app, routes, server)
+```
+
+### Convenience Function
+
+```python
+from x402.http.middleware.asgi import payment_middleware
+
+middleware = payment_middleware(routes, server, paywall_config={"appName": "My API"})
+app = middleware(your_asgi_app)
+```
+
+### Accessing Payment Info
+
+Payment data is stored in `scope['state']` for downstream handlers:
+
+```python
+async def app(scope, receive, send):
+    state = scope.get("state", {})
+    payload = state.get("x402_payment_payload")
+    requirements = state.get("x402_payment_requirements")
+    # Use payment data...
+```
+
 ## Sync/Async Matching
 
 | Framework | Server | Facilitator Client |
 |-----------|--------|-------------------|
 | FastAPI | `x402ResourceServer` | `HTTPFacilitatorClient` |
 | Flask | `x402ResourceServerSync` | `HTTPFacilitatorClientSync` |
+| Generic ASGI | `x402ResourceServerSync` | `HTTPFacilitatorClientSync` |
 
-Using async components with Flask raises `TypeError`.
+Using async components with Flask or the generic ASGI middleware raises `TypeError`.
 
 ## Route Patterns
 
@@ -184,4 +243,13 @@ PaymentMiddleware(app, routes, server, paywall_provider=MyPaywall())
 | `payment_middleware()` | Convenience function |
 | `payment_middleware_from_config()` | Create from config dict |
 | `FlaskAdapter` | HTTPAdapter for Flask |
+
+### Generic ASGI
+
+| Export | Description |
+|--------|-------------|
+| `X402ASGIMiddleware` | ASGI middleware class |
+| `payment_middleware()` | Create middleware factory |
+| `payment_middleware_from_config()` | Create from config dict |
+| `ASGIAdapter` | HTTPAdapter for raw ASGI scope |
 
