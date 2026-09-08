@@ -1226,6 +1226,25 @@ export class x402ResourceServer {
         ...requirements,
         amount: resolveSettlementOverrideAmount(settlementOverrides.amount, requirements, decimals),
       };
+
+      // Enforce the documented ceiling: the resolved override amount must not
+      // exceed the authorized maximum (PaymentRequirements.amount). A percent
+      // override > 100%, a dollar override above the token equivalent, or a
+      // raw override above the authorized cap would silently allow
+      // over-settlement without this guard.
+      const resolvedAmount = BigInt(effectiveRequirements.amount);
+      const authorizedMaximum = BigInt(requirements.amount);
+      if (resolvedAmount > authorizedMaximum) {
+        throw new SettleError(400, {
+          success: false,
+          errorReason: "settlement_override_exceeds_ceiling",
+          errorMessage:
+            `Settlement override amount ${effectiveRequirements.amount} exceeds ` +
+            `authorized maximum ${requirements.amount}`,
+          transaction: "",
+          network: requirements.network,
+        });
+      }
     }
 
     const context: SettleContext = {

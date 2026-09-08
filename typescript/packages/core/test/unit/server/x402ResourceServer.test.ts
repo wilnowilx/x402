@@ -1770,6 +1770,74 @@ describe("x402ResourceServer", () => {
       expect(mockClient.settleCalls[0].requirements.asset).toBe("0xOriginalToken");
     });
 
+    it("should reject settlement override that exceeds authorized ceiling", async () => {
+      const mockClient = new MockFacilitatorClient(
+        buildSupportedResponse({
+          kinds: [{ x402Version: 2, scheme: "exact", network: "eip155:8453" as Network }],
+        }),
+        undefined,
+        buildSettleResponse({ success: true }),
+      );
+
+      const server = new x402ResourceServer(mockClient);
+      const payload = buildPaymentPayload();
+      const requirements = buildPaymentRequirements({
+        scheme: "exact",
+        network: "eip155:8453" as Network,
+        amount: "1000000",
+      });
+
+      // 150% override exceeds the 1000000 ceiling
+      await expect(
+        server.settlePayment(payload, requirements, undefined, undefined, { amount: "150%" }),
+      ).rejects.toThrow(/exceeds authorized maximum/);
+    });
+
+    it("should reject raw atomic override that exceeds authorized ceiling", async () => {
+      const mockClient = new MockFacilitatorClient(
+        buildSupportedResponse({
+          kinds: [{ x402Version: 2, scheme: "exact", network: "eip155:8453" as Network }],
+        }),
+        undefined,
+        buildSettleResponse({ success: true }),
+      );
+
+      const server = new x402ResourceServer(mockClient);
+      const payload = buildPaymentPayload();
+      const requirements = buildPaymentRequirements({
+        scheme: "exact",
+        network: "eip155:8453" as Network,
+        amount: "1000000",
+      });
+
+      // Raw amount 2000000 exceeds the 1000000 ceiling
+      await expect(
+        server.settlePayment(payload, requirements, undefined, undefined, { amount: "2000000" }),
+      ).rejects.toThrow(/exceeds authorized maximum/);
+    });
+
+    it("should allow settlement override at exactly the authorized ceiling", async () => {
+      const mockClient = new MockFacilitatorClient(
+        buildSupportedResponse({
+          kinds: [{ x402Version: 2, scheme: "exact", network: "eip155:8453" as Network }],
+        }),
+        undefined,
+        buildSettleResponse({ success: true }),
+      );
+
+      const server = new x402ResourceServer(mockClient);
+      const payload = buildPaymentPayload();
+      const requirements = buildPaymentRequirements({
+        scheme: "exact",
+        network: "eip155:8453" as Network,
+        amount: "1000000",
+      });
+
+      await server.settlePayment(payload, requirements, undefined, undefined, { amount: "100%" });
+
+      expect(mockClient.settleCalls[0].requirements.amount).toBe("1000000");
+    });
+
     it("should pass overridden requirements to beforeSettle hooks", async () => {
       const mockClient = new MockFacilitatorClient(
         buildSupportedResponse(),
