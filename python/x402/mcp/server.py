@@ -3,12 +3,32 @@
 Provides create_payment_wrapper() to add x402 payment verification
 and settlement to FastMCP tool handlers.
 
-Example:
+Works with both MCP SDK 1.x (FastMCP) and 2.x (MCPServer).
+
+Example (MCP SDK 1.x):
     ```python
     from mcp.server.fastmcp import FastMCP
     from x402.mcp import create_payment_wrapper
 
     mcp = FastMCP("my-server")
+    wrapper = create_payment_wrapper(
+        resource_server,
+        accepts=weather_accepts,
+        resource=ResourceInfo(url="mcp://tool/get_weather", description="Get weather"),
+    )
+
+    @mcp.tool(name="get_weather", description="Get current weather")
+    @wrapper
+    async def get_weather(city: str) -> str:
+        return json.dumps({"city": city, "weather": "sunny", "temperature": 72})
+    ```
+
+Example (MCP SDK 2.x):
+    ```python
+    from mcp.server.mcpserver import MCPServer
+    from x402.mcp import create_payment_wrapper
+
+    mcp = MCPServer("my-server")
     wrapper = create_payment_wrapper(
         resource_server,
         accepts=weather_accepts,
@@ -88,8 +108,12 @@ def create_payment_wrapper(
     Returns:
         A decorator to apply to a FastMCP tool handler function.
     """
-    # Lazy import mcp types so the module can be imported without mcp installed
-    from mcp.server.fastmcp import Context
+    # Lazy import mcp types so the module can be imported without mcp installed.
+    # MCP SDK 2.x renamed FastMCP to MCPServer and moved Context.
+    try:
+        from mcp.server.fastmcp import Context
+    except (ImportError, ModuleNotFoundError):
+        from mcp.server.mcpserver import Context
 
     from mcp.types import CallToolResult, TextContent
 
