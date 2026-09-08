@@ -457,3 +457,52 @@ def test_convert_mcp_result_missing_attrs():
     assert result.is_error is False
     assert result.meta == {}
     assert result.structured_content is None
+
+
+def test_convert_mcp_result_prefers_meta_over_dunder_meta():
+    """MCP SDK 2.x exposes ``.meta`` (Pydantic field); ``._meta`` is the wire
+    alias only present in 1.x JSON transport.  convert_mcp_result must prefer
+    ``.meta`` so settlement metadata is not silently dropped.
+
+    Regression test for https://github.com/x402-foundation/x402/issues/3149
+    """
+    from x402.mcp.utils import convert_mcp_result
+
+    class McpSdk2Result:
+        """Simulates MCP SDK 2.x CallToolResult with .meta field."""
+        content = [{"type": "text", "text": "paid result"}]
+        isError = False
+        meta = {"x402/payment-response": {"success": True, "transaction": "0xabc"}}
+        structuredContent = None
+
+    result = convert_mcp_result(McpSdk2Result())
+    assert result.meta == {"x402/payment-response": {"success": True, "transaction": "0xabc"}}
+
+
+def test_convert_mcp_result_fallback_to_dunder_meta():
+    """MCP SDK 1.x only exposes ``._meta`` (no ``.meta`` attribute).
+    convert_mcp_result must fall back to ``._meta`` for backwards compat."""
+    from x402.mcp.utils import convert_mcp_result
+
+    class McpSdk1Result:
+        """Simulates MCP SDK 1.x result with only _meta."""
+        content = [{"type": "text", "text": "old result"}]
+        isError = False
+        _meta = {"legacy_key": "legacy_val"}
+
+    result = convert_mcp_result(McpSdk1Result())
+    assert result.meta == {"legacy_key": "legacy_val"}
+
+
+def test_convert_mcp_result_meta_takes_precedence():
+    """When both .meta and ._meta exist, .meta must win."""
+    from x402.mcp.utils import convert_mcp_result
+
+    class BothMetaResult:
+        content = []
+        isError = False
+        meta = {"correct": True}
+        _meta = {"stale": True}
+
+    result = convert_mcp_result(BothMetaResult())
+    assert result.meta == {"correct": True}

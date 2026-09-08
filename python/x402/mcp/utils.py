@@ -383,8 +383,11 @@ def convert_mcp_result(mcp_result: Any) -> "MCPToolResult":
     if is_error is None:
         is_error = getattr(mcp_result, "is_error", False)
 
-    # Extract meta
-    meta = getattr(mcp_result, "_meta", {})
+    # Extract meta — prefer .meta (MCP SDK 2.x Pydantic field) over
+    # ._meta (wire alias that only exists in 1.x JSON transport).
+    meta = getattr(mcp_result, "meta", None)
+    if meta is None:
+        meta = getattr(mcp_result, "_meta", None)
     if not isinstance(meta, dict):
         meta = {}
 
