@@ -370,6 +370,76 @@ In V2, hand-rolling `extensions.bazaar.schema` on a route config passes through 
   </Tab>
 </Tabs>
 
+### PaymentRequired Envelope (V1 vs V2)
+
+<Callout type="warning">
+This is the most commonly missed change during migration. Four independent implementations shipped the same defect because this was not documented.
+</Callout>
+
+The `PaymentRequired` response envelope changed significantly between V1 and V2:
+
+<Tabs>
+  <Tab title="V1 Envelope">
+    ```json
+    {
+      "x402Version": 1,
+      "error": "X-PAYMENT header is required",
+      "accepts": [
+        {
+          "scheme": "exact",
+          "network": "base-sepolia",
+          "maxAmountRequired": "10000",
+          "asset": "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
+          "payTo": "0x209693Bc6afc0C5328bA36FaF03C514EF312287C",
+          "resource": "https://api.example.com/premium-data",
+          "description": "Access to premium market data",
+          "mimeType": "application/json",
+          "maxTimeoutSeconds": 60
+        }
+      ]
+    }
+    ```
+  </Tab>
+  <Tab title="V2 Envelope">
+    ```json
+    {
+      "x402Version": 2,
+      "error": "PAYMENT-SIGNATURE header is required",
+      "resource": {
+        "url": "https://api.example.com/premium-data",
+        "description": "Access to premium market data",
+        "mimeType": "application/json"
+      },
+      "accepts": [
+        {
+          "scheme": "exact",
+          "network": "eip155:84532",
+          "amount": "10000",
+          "asset": "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
+          "payTo": "0x209693Bc6afc0C5328bA36FaF03C514EF312287C",
+          "maxTimeoutSeconds": 60
+        }
+      ],
+      "extensions": {}
+    }
+    ```
+  </Tab>
+</Tabs>
+
+**Key structural changes:**
+
+| Change | V1 | V2 |
+|--------|----|----|
+| `resource` location | String inside each `accepts[]` entry | **Top-level `ResourceInfo` object** with `url`, `description`, `mimeType`, `serviceName`, `tags`, `iconUrl` |
+| Amount field | `maxAmountRequired` | `amount` |
+| `error` field | Required | Optional |
+| `accepts[]` fields | Includes `resource`, `description`, `mimeType`, `outputSchema` | Only payment terms: `scheme`, `network`, `amount`, `asset`, `payTo`, `maxTimeoutSeconds`, `extra` |
+| `extensions` | Not present | Optional top-level object for protocol extensions |
+
+<Callout type="error">
+**Common mistake:** Parsing `resource` as a string (V1 pattern) when V2 sends it as an object. If your client does `typeof paymentRequired.resource === "string"`, it will fail silently on V2 responses.
+</Callout>
+
 ## Header Changes
 
 If you're implementing custom HTTP handling, update your header names:
