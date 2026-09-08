@@ -337,11 +337,24 @@ export class ExactStellarScheme implements SchemeNetworkFacilitator {
       const sendResult = await server.sendTransaction(txToSubmit);
 
       if (sendResult.status !== "PENDING") {
+        // Distinguish retryable (TRY_AGAIN_LATER) from permanent (ERROR)
+        // failures. TRY_AGAIN_LATER means nothing reached the ledger, nothing
+        // was spent, and the caller should retry. ERROR with txBadSeq means
+        // the payload is stale and must not be retried. Both arrived as the
+        // same opaque string before this fix.
+        const isRetryable = sendResult.status === "TRY_AGAIN_LATER";
+        const errorResultDetail = sendResult.errorResult
+          ? ` — ${JSON.stringify(sendResult.errorResult)}`
+          : "";
+
         return {
           success: false,
           network: payload.accepted.network,
           transaction: "",
-          errorReason: "settle_exact_stellar_transaction_submission_failed",
+          errorReason: isRetryable
+            ? "settle_exact_stellar_submission_retryable"
+            : "settle_exact_stellar_transaction_submission_failed",
+          errorMessage: `Submission status: ${sendResult.status}${errorResultDetail}. latestLedger: ${sendResult.latestLedger ?? "unknown"}`,
           payer,
         };
       }
