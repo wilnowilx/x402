@@ -573,12 +573,20 @@ export function extractDiscoveryInfo(
     return null;
   }
 
-  // Strip query params (?) and hash sections (#) for discovery cataloging
-  const url = new URL(resourceUrl);
-  // If a routeTemplate is present (dynamic route), use it as the canonical path
-  const canonicalUrl = routeTemplate
-    ? `${url.origin}${routeTemplate}`
-    : `${url.origin}${url.pathname}`;
+  // Strip query params (?) and hash sections (#) for discovery cataloging.
+  // Non-standard schemes (e.g. mcp://) produce an opaque origin via the URL
+  // constructor, so we use the raw resource URL directly for those.
+  let canonicalUrl: string;
+  if (resourceUrl.startsWith("mcp://")) {
+    // MCP URLs are opaque to WHATWG URL parsing; the raw value is already canonical.
+    canonicalUrl = resourceUrl;
+  } else {
+    const url = new URL(resourceUrl);
+    // If a routeTemplate is present (dynamic route), use it as the canonical path
+    canonicalUrl = routeTemplate
+      ? `${url.origin}${routeTemplate}`
+      : `${url.origin}${url.pathname}`;
+  }
 
   // Extract description and mimeType from resource info (v2) or requirements (v1)
   let description: string | undefined;

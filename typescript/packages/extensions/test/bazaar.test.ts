@@ -1644,6 +1644,43 @@ describe("Bazaar Discovery Extension", () => {
       expect(discovered).not.toBeNull();
       expect(discovered!.resourceUrl).toBe("https://mcp.example.com/tools");
     });
+
+    it("should preserve mcp:// scheme URLs as canonical without opaque origin corruption", () => {
+      const declared = declareDiscoveryExtension({
+        toolName: "financial_analysis",
+        description: "Analyze financial data",
+        inputSchema: {
+          type: "object",
+          properties: {
+            ticker: { type: "string" },
+          },
+        },
+      });
+
+      const extension = declared.bazaar;
+
+      const paymentPayload = {
+        x402Version: 2,
+        scheme: "exact",
+        network: "eip155:8453" as unknown,
+        payload: {},
+        accepted: {} as unknown,
+        resource: {
+          url: "mcp://tool/financial_analysis",
+          description: "MCP Tool",
+          mimeType: "application/json",
+        },
+        extensions: {
+          [BAZAAR.key]: extension,
+        },
+      };
+
+      const discovered = extractDiscoveryInfo(paymentPayload, {} as unknown);
+
+      expect(discovered).not.toBeNull();
+      expect(discovered!.resourceUrl).toBe("mcp://tool/financial_analysis");
+      expect((discovered as DiscoveredMCPResource).toolName).toBe("financial_analysis");
+    });
   });
 
   describe("validateAndExtract - MCP", () => {
