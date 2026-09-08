@@ -79,6 +79,29 @@ from .payment_identifier import (  # noqa: E402
     validate_payment_identifier,
     validate_payment_identifier_requirement,
 )
+from .receipt_attestation import (  # noqa: E402
+    RECEIPT_ATTESTATION,
+    RECEIPT_VERSION,
+    AttestationData,
+    InMemoryReceiptStorage,
+    ReceiptAttestationExtension,
+    ReceiptAttestationInfo,
+    ReceiptAttestationPayload,
+    ReceiptAttestationResourceServerExtension,
+    ReceiptData,
+    ReceiptGenerator,
+    ReceiptInfo,
+    ReceiptPayloadModel,
+    ReceiptStorage,
+    ReceiptVerifier,
+    SignedReceiptModel,
+    VerificationResult,
+    extract_receipt_from_extensions,
+    is_receipt_attestation_extension,
+    receipt_attestation_schema,
+    receipt_attestation_server_extension,
+    receipt_payload_schema,
+)
 from .sign_in_with_x import (  # noqa: E402
     SIGN_IN_WITH_X,
     SOLANA_DEVNET,
@@ -231,6 +254,34 @@ __all__ = [
     "validate_payment_identifier_requirement",
     "PaymentIdentifierValidationResult",
     "BazaarValidationResult",
+    # Receipt Attestation constants
+    "RECEIPT_ATTESTATION",
+    "RECEIPT_VERSION",
+    # Receipt Attestation data classes
+    "ReceiptData",
+    "AttestationData",
+    # Receipt Attestation Pydantic models
+    "ReceiptInfo",
+    "ReceiptAttestationExtension",
+    "ReceiptPayloadModel",
+    "SignedReceiptModel",
+    "ReceiptAttestationInfo",
+    "ReceiptAttestationPayload",
+    "VerificationResult",
+    # Receipt Attestation schemas
+    "receipt_attestation_schema",
+    "receipt_payload_schema",
+    # Receipt Attestation storage
+    "ReceiptStorage",
+    "InMemoryReceiptStorage",
+    # Receipt Attestation server
+    "ReceiptGenerator",
+    "ReceiptAttestationResourceServerExtension",
+    "receipt_attestation_server_extension",
+    # Receipt Attestation client
+    "ReceiptVerifier",
+    "extract_receipt_from_extensions",
+    "is_receipt_attestation_extension",
     # Sign-In-With-X constants
     "SIGN_IN_WITH_X",
     "SOLANA_MAINNET",
