@@ -1339,12 +1339,19 @@ export class x402HTTPResourceServer {
   private createHTTPPaymentRequiredResponse(paymentRequired: PaymentRequired): {
     headers: Record<string, string>;
   } {
-    return {
-      headers: {
-        "PAYMENT-REQUIRED": encodePaymentRequiredHeader(paymentRequired),
-        "Cache-Control": PAYMENT_REQUIRED_CACHE_CONTROL,
-      },
+    const headers: Record<string, string> = {
+      "PAYMENT-REQUIRED": encodePaymentRequiredHeader(paymentRequired),
+      "Cache-Control": PAYMENT_REQUIRED_CACHE_CONTROL,
     };
+
+    // Emit payment-error header when there is a rejection reason, so clients
+    // can distinguish "no payment sent" from "payment rejected" in a single
+    // request/response cycle without needing server-side log access.
+    if (paymentRequired.error) {
+      headers["payment-error"] = paymentRequired.error;
+    }
+
+    return { headers };
   }
 
   /**
